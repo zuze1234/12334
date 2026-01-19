@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  clap-detection:
+    build: .
+    container_name: clap-detection-app
+    ports:
+      - "5000:5000"
+    devices:
+      - /dev/snd:/dev/snd
+    environment:
+      - YANDEX_TOKEN=${YANDEX_TOKEN}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+      - HOST=0.0.0.0
+      - PORT=5000
+    volumes:
+      - ./config.json:/app/config.json
+      - ./app.log:/app/app.log
+    restart: unless-stopped
+    privileged: true

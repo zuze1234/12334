@@ -1,106 +1,907 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Системное сообщение</title>
+    <title>Clap Detection - Yandex Smart Home Controller</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        body {
-            background-color: #800000; /* Бордовый фон */
+        * {
             margin: 0;
             padding: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            font-family: Arial, sans-serif;
-            color: white;
-            user-select: none; /* Запрет выделения текста */
+            box-sizing: border-box;
         }
 
-        .warning {
-            font-size: 24px;
-            margin-bottom: 20px;
-            text-align: center;
+        :root {
+            --primary-color: #4CAF50;
+            --secondary-color: #2196F3;
+            --danger-color: #f44336;
+            --warning-color: #ff9800;
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --border-color: #ddd;
+            --shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        body.dark-theme {
+            --bg-color: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --border-color: #444;
+            --shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         .container {
-            text-align: center;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
         }
 
-        input, button {
-            padding: 10px;
-            margin: 5px;
+        header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 30px 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .card h2 {
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 3px solid var(--primary-color);
+            padding-bottom: 10px;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator.active {
+            background: rgba(76, 175, 80, 0.2);
+            color: var(--primary-color);
+        }
+
+        .status-indicator.inactive {
+            background: rgba(158, 158, 158, 0.2);
+            color: #666;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.active .status-dot {
+            background: var(--primary-color);
+        }
+
+        .status-indicator.inactive .status-dot {
+            background: #666;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        button {
+            padding: 12px 24px;
             border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: var(--shadow);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        button.secondary {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        button.danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        select, input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 5px;
+            background: var(--card-bg);
+            color: var(--text-color);
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+
+        .slider-container {
+            margin-bottom: 20px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: var(--border-color);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            border: none;
+        }
+
+        .level-meter {
+            width: 100%;
+            height: 30px;
+            background: var(--border-color);
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+            margin: 15px 0;
+        }
+
+        .level-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--warning-color), var(--danger-color));
+            transition: width 0.1s ease;
             border-radius: 5px;
         }
 
-        .fullscreen-block {
+        .device-list {
+            list-style: none;
+        }
+
+        .device-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: var(--bg-color);
+            border-radius: 8px;
+            border: 2px solid var(--border-color);
+        }
+
+        .device-info h3 {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        .device-info p {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .event-log {
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .event-item {
+            padding: 10px;
+            margin-bottom: 5px;
+            border-left: 3px solid var(--secondary-color);
+            background: var(--bg-color);
+            border-radius: 3px;
+        }
+
+        .event-item.double_clap {
+            border-left-color: var(--primary-color);
+        }
+
+        .event-item.error {
+            border-left-color: var(--danger-color);
+        }
+
+        .event-time {
+            color: #666;
+            font-size: 0.8rem;
+        }
+
+        .calibration-result {
+            background: var(--bg-color);
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            display: none;
+        }
+
+        .calibration-result.show {
+            display: block;
+        }
+
+        .calibration-result h3 {
+            margin-bottom: 10px;
+        }
+
+        .calibration-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat {
+            padding: 10px;
+            background: var(--card-bg);
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .toast {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 9999;
-            background-color: #800000;
+            bottom: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            color: var(--text-color);
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.show {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            header h1 {
+                font-size: 2rem;
+            }
+
+            .container {
+                padding: 10px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="fullscreen-block">
-        <div class="container">
-            <div class="warning">Ваш телефон взломан</div>
-            <div>Введите пароль для разблокировки:</div>
-            <input type="password" id="passwordInput">
-            <button onclick="checkPassword()">Разблокировать</button>
+    <div class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <span id="theme-icon">🌙</span>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>🎵 Clap Detection Controller</h1>
+            <p>Control your Yandex smart lamps with a double clap</p>
+        </header>
+
+        <div class="grid">
+            <!-- Status Panel -->
+            <div class="card">
+                <h2>📊 Status</h2>
+                <div style="margin-bottom: 15px;">
+                    <span class="status-indicator inactive" id="listening-status">
+                        <span class="status-dot"></span>
+                        <span>Not Listening</span>
+                    </span>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <span class="status-indicator inactive" id="yandex-status">
+                        <span class="status-dot"></span>
+                        <span>Yandex Disconnected</span>
+                    </span>
+                </div>
+                <div class="button-group">
+                    <button class="primary" onclick="startListening()" id="start-btn">▶️ Start Listening</button>
+                    <button class="danger" onclick="stopListening()" id="stop-btn" disabled>⏹️ Stop</button>
+                </div>
+            </div>
+
+            <!-- Microphone Selection -->
+            <div class="card">
+                <h2>🎤 Microphone</h2>
+                <select id="mic-select" onchange="selectMicrophone()">
+                    <option value="">Select microphone...</option>
+                </select>
+                <div class="level-meter">
+                    <div class="level-bar" id="audio-level-bar"></div>
+                </div>
+                <p style="text-align: center; font-size: 0.9rem; color: #666;">Audio Level</p>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Calibration Panel -->
+            <div class="card">
+                <h2>🎯 Calibration</h2>
+                <p style="margin-bottom: 15px;">Clap a few times to calibrate the detection threshold.</p>
+                <button class="secondary" onclick="startCalibration()" id="calibrate-btn">
+                    🔧 Start Calibration (3s)
+                </button>
+                <div class="calibration-result" id="calibration-result">
+                    <h3>Calibration Results:</h3>
+                    <div class="calibration-stats">
+                        <div class="stat">
+                            <div class="stat-label">Suggested</div>
+                            <div class="stat-value" id="suggested-threshold">0.00</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Max</div>
+                            <div class="stat-value" id="max-level">0.00</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Mean</div>
+                            <div class="stat-value" id="mean-level">0.00</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-label">Std Dev</div>
+                            <div class="stat-value" id="std-level">0.00</div>
+                        </div>
+                    </div>
+                    <button class="primary" onclick="applyCalibration()" style="margin-top: 15px; width: 100%;">
+                        ✓ Apply Suggested Threshold
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings Panel -->
+            <div class="card">
+                <h2>⚙️ Settings</h2>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Sensitivity</span>
+                        <span id="threshold-value">50%</span>
+                    </div>
+                    <input type="range" id="threshold-slider" min="0" max="100" value="50" oninput="updateThreshold(this.value)">
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Min Clap Interval</span>
+                        <span id="min-interval-value">100ms</span>
+                    </div>
+                    <input type="range" id="min-interval-slider" min="50" max="300" value="100" oninput="updateMinInterval(this.value)">
+                </div>
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Max Clap Interval</span>
+                        <span id="max-interval-value">500ms</span>
+                    </div>
+                    <input type="range" id="max-interval-slider" min="300" max="1000" value="500" oninput="updateMaxInterval(this.value)">
+                </div>
+                <div class="button-group">
+                    <button class="primary" onclick="saveSettings()">💾 Save Settings</button>
+                    <button class="secondary" onclick="loadSettings()">🔄 Reset to Saved</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Device Management -->
+        <div class="card">
+            <h2>💡 Devices</h2>
+            <ul class="device-list" id="device-list">
+                <li style="text-align: center; padding: 20px; color: #666;">
+                    Loading devices...
+                </li>
+            </ul>
+            <button class="secondary" onclick="refreshDevices()" style="width: 100%;">
+                🔄 Refresh Devices
+            </button>
+        </div>
+
+        <!-- Event Log -->
+        <div class="card">
+            <h2>📋 Event Log</h2>
+            <div class="event-log" id="event-log">
+                <div style="text-align: center; padding: 20px; color: #666;">
+                    No events yet
+                </div>
+            </div>
+            <button class="secondary" onclick="clearEventLog()" style="width: 100%; margin-top: 10px;">
+                🗑️ Clear Log
+            </button>
         </div>
     </div>
 
+    <div class="toast" id="toast"></div>
+
     <script>
-        // Блокировка контекстного меню
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            return false;
-        });
+        let socket;
+        let currentSettings = {};
+        let calibrationData = null;
 
-        // Блокировка клавиш
-        document.addEventListener('keydown', function(e) {
-            // Блокировка F12, Ctrl+Shift+I, Ctrl+Shift+C, Ctrl+U
-            if (
-                e.key === 'F12' ||
-                (e.ctrlKey && e.shiftKey && e.key === 'I') ||
-                (e.ctrlKey && e.shiftKey && e.key === 'C') ||
-                (e.ctrlKey && e.key === 'u')
-            ) {
-                e.preventDefault();
-                return false;
-            }
-        });
+        function initSocketIO() {
+            socket = io();
 
-        // Блокировка выделения текста
-        document.addEventListener('selectstart', function(e) {
-            e.preventDefault();
-            return false;
-        });
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                loadSettings();
+                loadAudioDevices();
+                refreshDevices();
+                loadEvents();
+            });
 
-        // Проверка пароля
-        function checkPassword() {
-            const input = document.getElementById('passwordInput');
-            if (input.value === '12345') {
-                alert('Система разблокирована!');
-                document.querySelector('.fullscreen-block').remove();
+            socket.on('status', (data) => {
+                updateStatus(data);
+            });
+
+            socket.on('audio_level', (data) => {
+                updateAudioLevel(data.level);
+            });
+
+            socket.on('clap_detected', (data) => {
+                showToast('👏 Clap detected!');
+            });
+
+            socket.on('device_toggled', (data) => {
+                showToast('💡 Devices toggled!');
+                refreshDevices();
+            });
+
+            socket.on('event', (event) => {
+                addEventToLog(event);
+            });
+        }
+
+        function updateStatus(data) {
+            const listeningStatus = document.getElementById('listening-status');
+            const yandexStatus = document.getElementById('yandex-status');
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+
+            if (data.is_listening) {
+                listeningStatus.className = 'status-indicator active';
+                listeningStatus.querySelector('span:last-child').textContent = 'Listening';
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
             } else {
-                alert('Неверный пароль!');
-                input.value = '';
+                listeningStatus.className = 'status-indicator inactive';
+                listeningStatus.querySelector('span:last-child').textContent = 'Not Listening';
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            }
+
+            if (data.yandex_connected) {
+                yandexStatus.className = 'status-indicator active';
+                yandexStatus.querySelector('span:last-child').textContent = 'Yandex Connected';
             }
         }
 
-        // Дополнительная защита от закрытия страницы
-        window.addEventListener('beforeunload', function(e) {
-            e.preventDefault();
-            e.returnValue = '';
-        });
+        function updateAudioLevel(level) {
+            const bar = document.getElementById('audio-level-bar');
+            const percentage = Math.min(100, level * 200);
+            bar.style.width = percentage + '%';
+        }
+
+        async function loadAudioDevices() {
+            try {
+                const response = await fetch('/api/audio-devices');
+                const data = await response.json();
+                
+                const select = document.getElementById('mic-select');
+                select.innerHTML = '<option value="">Select microphone...</option>';
+                
+                data.devices.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.index;
+                    option.textContent = `${device.name} (${device.channels} ch, ${device.sample_rate} Hz)`;
+                    select.appendChild(option);
+                });
+
+                if (currentSettings.audio && currentSettings.audio.selected_device !== null) {
+                    select.value = currentSettings.audio.selected_device;
+                }
+            } catch (error) {
+                console.error('Error loading audio devices:', error);
+            }
+        }
+
+        async function selectMicrophone() {
+            const select = document.getElementById('mic-select');
+            const deviceIndex = select.value ? parseInt(select.value) : null;
+            
+            currentSettings.audio = currentSettings.audio || {};
+            currentSettings.audio.selected_device = deviceIndex;
+            
+            await saveSettings();
+            showToast('Microphone updated');
+        }
+
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/settings');
+                const data = await response.json();
+                currentSettings = data;
+                
+                document.getElementById('threshold-slider').value = data.audio.threshold;
+                document.getElementById('threshold-value').textContent = data.audio.threshold + '%';
+                
+                document.getElementById('min-interval-slider').value = data.audio.min_clap_interval;
+                document.getElementById('min-interval-value').textContent = data.audio.min_clap_interval + 'ms';
+                
+                document.getElementById('max-interval-slider').value = data.audio.max_clap_interval;
+                document.getElementById('max-interval-value').textContent = data.audio.max_clap_interval + 'ms';
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        async function saveSettings() {
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentSettings)
+                });
+                
+                if (response.ok) {
+                    showToast('✓ Settings saved');
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showToast('✗ Error saving settings', 'error');
+            }
+        }
+
+        function updateThreshold(value) {
+            document.getElementById('threshold-value').textContent = value + '%';
+            currentSettings.audio.threshold = parseInt(value);
+        }
+
+        function updateMinInterval(value) {
+            document.getElementById('min-interval-value').textContent = value + 'ms';
+            currentSettings.audio.min_clap_interval = parseInt(value);
+        }
+
+        function updateMaxInterval(value) {
+            document.getElementById('max-interval-value').textContent = value + 'ms';
+            currentSettings.audio.max_clap_interval = parseInt(value);
+        }
+
+        async function startCalibration() {
+            const btn = document.getElementById('calibrate-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> Calibrating...';
+            
+            try {
+                const response = await fetch('/api/calibrate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ duration: 3.0 })
+                });
+                
+                calibrationData = await response.json();
+                
+                document.getElementById('suggested-threshold').textContent = (calibrationData.suggested_threshold * 100).toFixed(1);
+                document.getElementById('max-level').textContent = calibrationData.max.toFixed(3);
+                document.getElementById('mean-level').textContent = calibrationData.mean.toFixed(3);
+                document.getElementById('std-level').textContent = calibrationData.std.toFixed(3);
+                
+                document.getElementById('calibration-result').classList.add('show');
+                showToast('✓ Calibration complete');
+            } catch (error) {
+                console.error('Error during calibration:', error);
+                showToast('✗ Calibration failed', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔧 Start Calibration (3s)';
+            }
+        }
+
+        function applyCalibration() {
+            if (calibrationData) {
+                const threshold = Math.round(calibrationData.suggested_threshold * 100);
+                document.getElementById('threshold-slider').value = threshold;
+                updateThreshold(threshold);
+                saveSettings();
+                showToast('✓ Threshold applied');
+            }
+        }
+
+        async function refreshDevices() {
+            try {
+                const response = await fetch('/api/devices');
+                const data = await response.json();
+                
+                const list = document.getElementById('device-list');
+                list.innerHTML = '';
+                
+                if (data.devices && data.devices.length > 0) {
+                    data.devices.forEach(device => {
+                        const li = document.createElement('li');
+                        li.className = 'device-item';
+                        li.innerHTML = `
+                            <div class="device-info">
+                                <h3>💡 ${device.name}</h3>
+                                <p>${device.room} • ${device.type}</p>
+                            </div>
+                            <button class="primary" onclick="toggleDevice('${device.id}')">
+                                Toggle
+                            </button>
+                        `;
+                        list.appendChild(li);
+                    });
+                } else {
+                    list.innerHTML = '<li style="text-align: center; padding: 20px; color: #666;">No devices found</li>';
+                }
+            } catch (error) {
+                console.error('Error loading devices:', error);
+            }
+        }
+
+        async function toggleDevice(deviceId) {
+            try {
+                const response = await fetch('/api/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device_id: deviceId })
+                });
+                
+                if (response.ok) {
+                    showToast('✓ Device toggled');
+                }
+            } catch (error) {
+                console.error('Error toggling device:', error);
+                showToast('✗ Error toggling device', 'error');
+            }
+        }
+
+        async function startListening() {
+            try {
+                const response = await fetch('/api/listening', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ listening: true })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus({ is_listening: data.listening });
+                }
+            } catch (error) {
+                console.error('Error starting listening:', error);
+            }
+        }
+
+        async function stopListening() {
+            try {
+                const response = await fetch('/api/listening', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ listening: false })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus({ is_listening: data.listening });
+                }
+            } catch (error) {
+                console.error('Error stopping listening:', error);
+            }
+        }
+
+        async function loadEvents() {
+            try {
+                const response = await fetch('/api/events');
+                const data = await response.json();
+                
+                const log = document.getElementById('event-log');
+                log.innerHTML = '';
+                
+                if (data.events && data.events.length > 0) {
+                    data.events.forEach(event => {
+                        addEventToLog(event);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading events:', error);
+            }
+        }
+
+        function addEventToLog(event) {
+            const log = document.getElementById('event-log');
+            
+            if (log.children.length === 1 && log.children[0].textContent.includes('No events')) {
+                log.innerHTML = '';
+            }
+            
+            const div = document.createElement('div');
+            div.className = `event-item ${event.type}`;
+            
+            const time = new Date(event.timestamp).toLocaleTimeString();
+            div.innerHTML = `
+                <div class="event-time">${time}</div>
+                <div>${event.message}</div>
+            `;
+            
+            log.insertBefore(div, log.firstChild);
+            
+            while (log.children.length > 50) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function clearEventLog() {
+            const log = document.getElementById('event-log');
+            log.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">No events yet</div>';
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle('dark-theme');
+            const icon = document.getElementById('theme-icon');
+            icon.textContent = document.body.classList.contains('dark-theme') ? '☀️' : '🌙';
+            
+            localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
+        }
+
+        function loadTheme() {
+            const theme = localStorage.getItem('theme');
+            if (theme === 'dark') {
+                document.body.classList.add('dark-theme');
+                document.getElementById('theme-icon').textContent = '☀️';
+            }
+        }
+
+        loadTheme();
+        initSocketIO();
     </script>
 </body>
 </html>
